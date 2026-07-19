@@ -107,9 +107,11 @@ export async function saveQuizResult(userId, courseId, quizData) {
 }
 
 export async function getStudentQuizResults(userId) {
-  const q = query(collection(db, 'quizResults'), where('userId', '==', userId), orderBy('completedAt', 'desc'));
+  const q = query(collection(db, 'quizResults'), where('userId', '==', userId));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.completedAt?.toMillis?.() || 0) - (a.completedAt?.toMillis?.() || 0));
 }
 
 export async function getCourseQuizResults(courseId) {
@@ -169,12 +171,14 @@ export async function createAnnouncement(data) {
 export async function getAnnouncements(courseId = null) {
   let q;
   if (courseId) {
-    q = query(collection(db, 'announcements'), where('courseId', '==', courseId), orderBy('createdAt', 'desc'));
+    q = query(collection(db, 'announcements'), where('courseId', '==', courseId));
   } else {
     q = query(collection(db, 'announcements'), orderBy('createdAt', 'desc'), limit(10));
   }
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
 }
 
 // ─────────────────────────────────────────────────────────
