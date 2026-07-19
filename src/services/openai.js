@@ -79,7 +79,7 @@ Always end with a follow-up question to check understanding.`,
       messages,
       tools,
       tool_choice: 'auto',
-      max_tokens: 1000,
+      max_completion_tokens: 1000,
     }),
   });
 
@@ -110,7 +110,7 @@ Always end with a follow-up question to check understanding.`,
       body: JSON.stringify({
         model: 'gpt-5.6',
         messages: [...messages, choice.message, ...toolResults],
-        max_tokens: 1000,
+        max_completion_tokens: 1000,
       }),
     });
     const data2 = await response2.json();
@@ -154,7 +154,7 @@ Return ONLY a JSON object with this exact structure:
 }`,
         },
       ],
-      max_tokens: 2000,
+      max_completion_tokens: 2000,
       response_format: { type: 'json_object' },
     }),
   });
@@ -203,7 +203,7 @@ Return ONLY this JSON structure:
 }`,
         },
       ],
-      max_tokens: 2000,
+      max_completion_tokens: 2000,
       response_format: { type: 'json_object' },
     }),
   });
@@ -308,7 +308,7 @@ export async function generateProgressReport(userId, onProgress = null) {
         messages,
         tools,
         tool_choice: toolChoice,
-        max_tokens: 800,
+        max_completion_tokens: 800,
       }),
     });
 
@@ -373,7 +373,7 @@ Include two to four strengths and gaps. Do not include markdown or additional ke
     body: JSON.stringify({
       model: 'gpt-5.6',
       messages: finalMessages,
-      max_tokens: 1200,
+      max_completion_tokens: 1200,
       response_format: { type: 'json_object' },
     }),
   });
@@ -436,7 +436,7 @@ Source content:
 ${content.slice(0, 12000)}`,
         },
       ],
-      max_tokens: 1600,
+      max_completion_tokens: 1600,
       response_format: { type: 'json_object' },
     }),
   });
@@ -496,7 +496,7 @@ Return ONLY this JSON structure:
 }`,
         },
       ],
-      max_tokens: 700,
+      max_completion_tokens: 700,
       response_format: { type: 'json_object' },
     }),
   });
@@ -544,7 +544,7 @@ export async function analyzeImage(base64Image, mimeType = 'image/jpeg', prompt 
           ],
         },
       ],
-      max_tokens: 1500,
+      max_completion_tokens: 1500,
     }),
   });
 
@@ -629,7 +629,7 @@ export async function summarizeContent(text, type = 'lecture') {
 Content: ${text.slice(0, 3000)}`,
         },
       ],
-      max_tokens: 1500,
+      max_completion_tokens: 1500,
       response_format: { type: 'json_object' },
     }),
   });
