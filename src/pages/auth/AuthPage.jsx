@@ -39,6 +39,9 @@ export default function AuthPage() {
       if (mode === 'login') {
         const cred = await login(form.email, form.password);
         const profile = await import('../../services/database').then(m => m.getUserProfile(cred.user.uid));
+        if (!profile?.role) {
+          throw new Error('This account is missing a role profile. Ask the admin to set role to student or admin.');
+        }
         toast.success(`Welcome back, ${cred.user.displayName}!`);
         navigate(profile?.role === 'admin' ? '/admin' : '/dashboard');
       } else {
@@ -52,7 +55,7 @@ export default function AuthPage() {
         navigate(role === 'admin' ? '/admin' : '/dashboard');
       }
     } catch (err) {
-      toast.error(err.message.replace('Firebase: ', '').replace(/\(auth\/.*\)/, ''));
+      toast.error(getAuthErrorMessage(err));
     }
     setLoading(false);
   }
@@ -61,6 +64,14 @@ export default function AuthPage() {
     setMode('login');
     setForm(f => ({ ...f, email, password: '' }));
     toast.success('Demo email selected. Enter the evaluator demo password to continue.');
+  }
+
+  function getAuthErrorMessage(err) {
+    const message = err?.message || 'Unable to sign in. Please check the account and try again.';
+    return message
+      .replace('Firebase: ', '')
+      .replace(/\(auth\/.*\)/, '')
+      .trim() || 'Unable to sign in. Please check the account and try again.';
   }
 
   function update(key, val) { setForm(f => ({ ...f, [key]: val })); }
