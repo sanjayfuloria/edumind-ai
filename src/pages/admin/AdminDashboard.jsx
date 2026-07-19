@@ -8,8 +8,12 @@ import { Users, BookOpen, BarChart3, Plus, Trash2, Megaphone, Sparkles, Loader, 
 
 export default function AdminDashboard() {
   const { userProfile } = useAuth();
-  const [stats, setStats] = useState(null);
-  const [courses, setCourses] = useState([]);
+  const [stats, setStats] = useState({
+  totalStudents: 0,
+  totalCourses: 0,
+  totalEnrollments: 0,
+  avgQuizScore: 0,
+});
   const [students, setStudents] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [showCourseForm, setShowCourseForm] = useState(false);
