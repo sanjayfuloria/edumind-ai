@@ -1,12 +1,13 @@
 // src/components/shared/Layout.jsx
-import { useNavigate, useLocation } from 'react-router-dom';
+import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
 import {
   Brain, LayoutDashboard, BookOpen, Mic, Image, Trophy, LogOut,
-  Shield, Users, BarChart3, Megaphone, Sparkles, Settings, Menu, X
+  Shield, Users, BarChart3, Megaphone, Sparkles, CalendarDays, Activity, Menu, X
 } from 'lucide-react';
 import { useState } from 'react';
+import StudentOnboardingModal from './StudentOnboardingModal';
 
 const STUDENT_NAV = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -14,13 +15,16 @@ const STUDENT_NAV = [
   { path: '/dashboard/voice', label: 'Voice Q&A', icon: Mic },
   { path: '/dashboard/vision', label: 'Image Analysis', icon: Image },
   { path: '/dashboard/quiz', label: 'Quiz Center', icon: Trophy },
+  { path: '/dashboard/studyplan', label: 'Study Plan', icon: CalendarDays },
+  { path: '/dashboard/progress', label: 'Progress Coach', icon: Activity },
 ];
 
 const ADMIN_NAV = [
   { path: '/admin', label: 'Overview', icon: BarChart3 },
-  { path: '/admin?tab=courses', label: 'Courses', icon: BookOpen },
-  { path: '/admin?tab=students', label: 'Students', icon: Users },
-  { path: '/admin?tab=announcements', label: 'Announcements', icon: Megaphone },
+  { path: '/admin/courses', label: 'Courses', icon: BookOpen },
+  { path: '/admin/students', label: 'Students', icon: Users },
+  { path: '/admin/announcements', label: 'Announcements', icon: Megaphone },
+  { path: '/admin/aitools', label: 'AI Tools', icon: Sparkles },
 ];
 
 export default function Layout({ children }) {
@@ -40,7 +44,7 @@ export default function Layout({ children }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--color-surface)' }}>
       {/* Sidebar */}
-      <div style={{
+      <div className="print-hide" style={{
         width: sidebarOpen ? '240px' : '64px', minHeight: '100vh', background: 'white',
         borderRight: '1px solid var(--color-border)', display: 'flex', flexDirection: 'column',
         transition: 'width 0.25s ease', flexShrink: 0, position: 'sticky', top: 0, height: '100vh', overflow: 'hidden',
@@ -76,13 +80,12 @@ export default function Layout({ children }) {
         {/* Nav links */}
         <nav style={{ flex: 1, padding: '12px 8px', display: 'flex', flexDirection: 'column', gap: '2px' }}>
           {nav.map(({ path, label, icon: Icon }) => {
-            const isActive = location.pathname === path.split('?')[0] && (path === location.pathname || path.includes('?'));
-            const exactActive = location.pathname === path.split('?')[0];
+            const exactActive = location.pathname === path;
             return (
-              <button key={path} onClick={() => navigate(path.split('?')[0])} className={`sidebar-link ${exactActive ? 'active' : ''}`} title={!sidebarOpen ? label : ''}>
+              <Link key={path} to={path} className={`sidebar-link ${exactActive ? 'active' : ''}`} title={!sidebarOpen ? label : ''}>
                 <Icon size={18} />
                 {sidebarOpen && <span>{label}</span>}
-              </button>
+              </Link>
             );
           })}
         </nav>
@@ -100,6 +103,7 @@ export default function Layout({ children }) {
       <div style={{ flex: 1, overflow: 'auto' }}>
         {children}
       </div>
+      {!isAdmin && <StudentOnboardingModal />}
     </div>
   );
 }

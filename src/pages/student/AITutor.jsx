@@ -116,7 +116,7 @@ export default function AITutor() {
           </div>
           <div>
             <h2 style={{ fontSize: '16px', margin: 0 }}>AI Tutor</h2>
-            <p style={{ fontSize: '12px', color: 'var(--color-muted)', margin: 0 }}>Powered by GPT-4o with function calling</p>
+            <p style={{ fontSize: '12px', color: 'var(--color-muted)', margin: 0 }}>Powered by GPT-5.6 with function calling</p>
           </div>
         </div>
 

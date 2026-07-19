@@ -1,0 +1,14 @@
+# Add these locations inside the HTTPS server block for sanjayfuloria.tech.
+
+location /edumind-ai/ {
+    try_files $uri $uri/ /edumind-ai/index.html;
+}
+
+location /edumind-ai-api/ {
+    proxy_pass http://127.0.0.1:3105/;
+    proxy_http_version 1.1;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_read_timeout 120s;
+    client_max_body_size 25M;
+}

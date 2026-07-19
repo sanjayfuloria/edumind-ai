@@ -42,6 +42,7 @@ export function AuthProvider({ children }) {
       photoURL: null,
       bio: '',
       enrolledCourses: [],
+      onboardingComplete: false,
     });
     const profile = await getUserProfile(cred.user.uid);
     setUserProfile(profile);
@@ -64,6 +65,14 @@ export function AuthProvider({ children }) {
     await sendPasswordResetEmail(auth, email);
   }
 
+  async function refreshUserProfile() {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return null;
+    const profile = await getUserProfile(firebaseUser.uid);
+    setUserProfile(profile);
+    return profile;
+  }
+
   const isAdmin = userProfile?.role === 'admin';
   const isStudent = userProfile?.role === 'student';
 
@@ -78,6 +87,7 @@ export function AuthProvider({ children }) {
       login,
       logout,
       resetPassword,
+      refreshUserProfile,
     }}>
       {!loading && children}
     </AuthContext.Provider>

@@ -1,39 +1,80 @@
 // src/pages/admin/AdminDashboard.jsx
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getAnalyticsSummary, getAllUsers, getAllCourses, createCourse, deleteCourse, createAnnouncement } from '../../services/database';
-import { generateStudyPlan } from '../../services/openai';
+import { generateStudyPlan, summarizeCourseContent } from '../../services/openai';
 import toast from 'react-hot-toast';
-import { Users, BookOpen, BarChart3, Plus, Trash2, Megaphone, Sparkles, Loader, Shield, TrendingUp, Award } from 'lucide-react';
+import { Users, BookOpen, BarChart3, Plus, Trash2, Megaphone, Sparkles, Loader, Shield, TrendingUp, Award, FileText, Clock3, CheckCircle2 } from 'lucide-react';
 
 export default function AdminDashboard() {
   const { userProfile } = useAuth();
+  const location = useLocation();
+  const navigate = useNavigate();
   const [stats, setStats] = useState({
-  totalStudents: 0,
-  totalCourses: 0,
-  totalEnrollments: 0,
-  avgQuizScore: 0,
-});
+    totalStudents: 0,
+    totalCourses: 0,
+    totalEnrollments: 0,
+    totalQuizAttempts: 0,
+    avgQuizScore: 0,
+  });
+  const [courses, setCourses] = useState([]);
   const [students, setStudents] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [showCourseForm, setShowCourseForm] = useState(false);
   const [courseForm, setCourseForm] = useState({ title: '', description: '', level: 'Beginner', duration: '4 weeks' });
   const [announcementForm, setAnnouncementForm] = useState({ title: '', message: '' });
   const [loadingPlan, setLoadingPlan] = useState(null);
+  const [aiSource, setAiSource] = useState('');
+  const [aiSummary, setAiSummary] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [creatingAiCourse, setCreatingAiCourse] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const tabFromPath = location.pathname.replace('/admin/', '');
+    const tabFromQuery = new URLSearchParams(location.search).get('tab');
+    const tab = tabFromPath && tabFromPath !== '/admin' ? tabFromPath : tabFromQuery || 'overview';
+    setActiveTab(['overview', 'courses', 'students', 'announcements', 'aitools'].includes(tab) ? tab : 'overview');
+  }, [location.pathname, location.search]);
+
+  useEffect(() => {
     async function load() {
-      try {
-        const [s, c, u] = await Promise.all([
-          getAnalyticsSummary(),
-          getAllCourses(),
-          getAllUsers('student'),
-        ]);
-        setStats(s);
-        setCourses(c);
-        setStudents(u);
-      } catch (e) { toast.error('Failed to load data'); }
+      const [statsResult, coursesResult, studentsResult] = await Promise.allSettled([
+        getAnalyticsSummary(),
+        getAllCourses(),
+        getAllUsers('student'),
+      ]);
+
+      if (statsResult.status === 'fulfilled') {
+        setStats(statsResult.value);
+      } else {
+        setStats({ totalStudents: 0, totalCourses: 0, totalEnrollments: 0, totalQuizAttempts: 0, avgQuizScore: 0 });
+      }
+
+      if (coursesResult.status === 'fulfilled') {
+        setCourses(coursesResult.value);
+      }
+
+      if (studentsResult.status === 'fulfilled') {
+        setStudents(studentsResult.value);
+      }
+
+      const failedSections = [
+        statsResult.status === 'rejected' ? 'analytics' : null,
+        coursesResult.status === 'rejected' ? 'courses' : null,
+        studentsResult.status === 'rejected' ? 'students' : null,
+      ].filter(Boolean);
+
+      if (failedSections.length > 0) {
+        toast.error(`Could not load ${failedSections.join(', ')}. Check Firestore rules/indexes.`);
+        console.error('Admin dashboard load failed:', {
+          analytics: statsResult.status === 'rejected' ? statsResult.reason : null,
+          courses: coursesResult.status === 'rejected' ? coursesResult.reason : null,
+          students: studentsResult.status === 'rejected' ? studentsResult.reason : null,
+        });
+      }
+
       setLoading(false);
     }
     load();
@@ -45,11 +86,14 @@ export default function AdminDashboard() {
       const ref = await createCourse(courseForm);
       const newCourse = { id: ref.id, ...courseForm, enrolledCount: 0 };
       setCourses(prev => [newCourse, ...prev]);
-      setStats(prev => ({ ...prev, totalCourses: prev.totalCourses + 1 }));
+      setStats(prev => prev
+        ? ({ ...prev, totalCourses: (prev.totalCourses || 0) + 1 })
+        : ({ totalStudents: 0, totalCourses: 1, totalEnrollments: 0, totalQuizAttempts: 0, avgQuizScore: 0 })
+      );
       setShowCourseForm(false);
       setCourseForm({ title: '', description: '', level: 'Beginner', duration: '4 weeks' });
       toast.success('Course created!');
-    } catch (e) { toast.error('Failed to create course'); }
+    } catch { toast.error('Failed to create course'); }
   }
 
   async function handleDeleteCourse(id) {
@@ -58,7 +102,7 @@ export default function AdminDashboard() {
       await deleteCourse(id);
       setCourses(prev => prev.filter(c => c.id !== id));
       toast.success('Course deleted');
-    } catch (e) { toast.error('Delete failed'); }
+    } catch { toast.error('Delete failed'); }
   }
 
   async function handleAnnouncement(e) {
@@ -67,21 +111,67 @@ export default function AdminDashboard() {
       await createAnnouncement({ ...announcementForm, createdBy: userProfile.displayName });
       setAnnouncementForm({ title: '', message: '' });
       toast.success('Announcement published!');
-    } catch (e) { toast.error('Failed to publish'); }
+    } catch { toast.error('Failed to publish'); }
   }
 
   async function generatePlan(course) {
     setLoadingPlan(course.id);
     try {
-      const plan = await generateStudyPlan(course.title, course.level || 'Beginner', 4);
+      const plan = await generateStudyPlan(course, 8, 4);
       const blob = new Blob([JSON.stringify(plan, null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url; a.download = `study-plan-${course.title.replace(/\s+/g, '-')}.json`;
       a.click();
       toast.success('Study plan generated & downloaded!');
-    } catch (e) { toast.error('Plan generation failed'); }
+    } catch { toast.error('Plan generation failed'); }
     setLoadingPlan(null);
+  }
+
+  async function handleAiSummary(e) {
+    e.preventDefault();
+    if (aiSource.trim().length < 100) return;
+
+    setAiLoading(true);
+    setAiSummary(null);
+    try {
+      const summary = await summarizeCourseContent(aiSource);
+      setAiSummary(summary);
+      toast.success('Course brief generated!');
+    } catch (error) {
+      toast.error(error.message || 'Failed to analyze content');
+    } finally {
+      setAiLoading(false);
+    }
+  }
+
+  async function handleCreateAiCourse() {
+    if (!aiSummary) return;
+
+    const courseData = {
+      title: aiSummary.suggested_title,
+      description: aiSummary.description,
+      level: aiSummary.difficulty_level,
+      duration: `${Math.max(1, Math.ceil(aiSummary.estimated_study_hours / 8))} weeks`,
+    };
+
+    setCreatingAiCourse(true);
+    setCourseForm(courseData);
+    try {
+      const ref = await createCourse(courseData);
+      setCourses(prev => [{ id: ref.id, ...courseData, enrolledCount: 0 }, ...prev]);
+      setStats(prev => prev
+        ? ({ ...prev, totalCourses: (prev.totalCourses || 0) + 1 })
+        : ({ totalStudents: 0, totalCourses: 1, totalEnrollments: 0, totalQuizAttempts: 0, avgQuizScore: 0 })
+      );
+      setShowCourseForm(false);
+      handleTabChange('courses');
+      toast.success('AI-generated course created!');
+    } catch (error) {
+      toast.error(error.message || 'Failed to create AI-generated course');
+    } finally {
+      setCreatingAiCourse(false);
+    }
   }
 
   const tabs = [
@@ -89,7 +179,12 @@ export default function AdminDashboard() {
     { id: 'courses', label: 'Courses', icon: BookOpen },
     { id: 'students', label: 'Students', icon: Users },
     { id: 'announcements', label: 'Announcements', icon: Megaphone },
+    { id: 'aitools', label: 'AI Tools', icon: Sparkles },
   ];
+
+  function handleTabChange(id) {
+    navigate(id === 'overview' ? '/admin' : `/admin/${id}`);
+  }
 
   return (
     <div style={{ padding: '32px', maxWidth: '1200px', margin: '0 auto' }}>
@@ -103,9 +198,9 @@ export default function AdminDashboard() {
       </div>
 
       {/* Tabs */}
-      <div style={{ display: 'flex', gap: '4px', marginBottom: '28px', background: '#F1F5F9', borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px', marginBottom: '28px', background: '#F1F5F9', borderRadius: '12px', padding: '4px', width: 'fit-content' }}>
         {tabs.map(({ id, label, icon: Icon }) => (
-          <button key={id} onClick={() => setActiveTab(id)} style={{
+          <button key={id} onClick={() => handleTabChange(id)} style={{
             padding: '8px 18px', borderRadius: '8px', border: 'none', cursor: 'pointer', fontFamily: 'Space Grotesk', fontWeight: 500, fontSize: '13px',
             background: activeTab === id ? 'white' : 'transparent', color: activeTab === id ? 'var(--color-admin)' : 'var(--color-muted)',
             display: 'flex', alignItems: 'center', gap: '6px', transition: 'all 0.2s',
@@ -302,6 +397,86 @@ export default function AdminDashboard() {
                   </button>
                 </form>
               </div>
+            </div>
+          )}
+
+          {/* AI TOOLS TAB */}
+          {activeTab === 'aitools' && (
+            <div className="fade-in">
+              <div style={{ marginBottom: '20px' }}>
+                <h2 style={{ fontSize: '18px', marginBottom: '6px' }}>AI Content Studio</h2>
+                <p style={{ color: 'var(--color-muted)', fontSize: '14px' }}>Transform source material into a structured course brief with GPT-5.6.</p>
+              </div>
+
+              <form className="card" onSubmit={handleAiSummary} style={{ marginBottom: '20px' }}>
+                <label htmlFor="ai-source" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '8px' }}>
+                  <span style={{ display: 'flex', alignItems: 'center', gap: '7px', fontFamily: 'Space Grotesk', fontSize: '13px', fontWeight: 600 }}><FileText size={15} color="var(--color-admin)" /> Source text or URL</span>
+                  <span style={{ fontSize: '12px', color: aiSource.trim().length >= 100 ? 'var(--color-secondary)' : 'var(--color-muted)' }}>{aiSource.trim().length} / 100 minimum</span>
+                </label>
+                <textarea
+                  id="ai-source"
+                  className="input-field"
+                  rows={8}
+                  minLength={100}
+                  value={aiSource}
+                  onChange={e => setAiSource(e.target.value)}
+                  placeholder="Paste at least 100 characters of lecture notes, an article, syllabus content, or a URL with supporting context..."
+                  style={{ resize: 'vertical', lineHeight: 1.6 }}
+                  required
+                />
+                <button type="submit" className="btn-primary" disabled={aiLoading || aiSource.trim().length < 100} style={{ marginTop: '14px' }}>
+                  {aiLoading ? <><Loader className="spin" size={16} /> Analyzing with GPT-5.6...</> : <><Sparkles size={16} /> Generate course brief</>}
+                </button>
+              </form>
+
+              {aiLoading && (
+                <div className="card fade-in" aria-live="polite" style={{ textAlign: 'center', padding: '44px' }}>
+                  <Loader className="spin" size={30} color="var(--color-admin)" style={{ margin: '0 auto 12px' }} />
+                  <h3 style={{ fontSize: '16px', marginBottom: '6px' }}>GPT-5.6 is structuring your content</h3>
+                  <p style={{ color: 'var(--color-muted)', fontSize: '13px' }}>Identifying learning outcomes, assessment topics, and the right difficulty level...</p>
+                </div>
+              )}
+
+              {aiSummary && !aiLoading && (
+                <div className="card fade-in" style={{ border: '1.5px solid #C4B5FD', padding: 0, overflow: 'hidden' }}>
+                  <div style={{ padding: '22px 24px', background: 'linear-gradient(135deg, #F5F3FF, #EEF2FF)', borderBottom: '1px solid #DDD6FE' }}>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '16px' }}>
+                      <div>
+                        <span style={{ color: 'var(--color-admin)', fontFamily: 'Space Grotesk', fontSize: '11px', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>AI-suggested course</span>
+                        <h3 style={{ fontSize: '21px', marginTop: '5px' }}>{aiSummary.suggested_title}</h3>
+                      </div>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '7px' }}>
+                        <span className="badge badge-admin">{aiSummary.difficulty_level}</span>
+                        <span className="badge badge-warning"><Clock3 size={11} /> {aiSummary.estimated_study_hours} hours</span>
+                      </div>
+                    </div>
+                    <p style={{ color: 'var(--color-muted)', fontSize: '14px', lineHeight: 1.65, marginTop: '12px' }}>{aiSummary.description}</p>
+                  </div>
+
+                  <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: '24px', padding: '24px' }}>
+                    <div>
+                      <h4 style={{ fontSize: '14px', marginBottom: '12px' }}>Key points</h4>
+                      <ul style={{ display: 'grid', gap: '9px', listStyle: 'none' }}>
+                        {aiSummary.key_points.map((point, index) => (
+                          <li key={index} style={{ display: 'flex', alignItems: 'flex-start', gap: '8px', color: 'var(--color-muted)', fontSize: '13px' }}><CheckCircle2 size={15} color="var(--color-secondary)" style={{ flexShrink: 0, marginTop: '3px' }} /><span>{point}</span></li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <h4 style={{ fontSize: '14px', marginBottom: '12px' }}>Suggested quiz topics</h4>
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: '7px' }}>
+                        {aiSummary.suggested_quiz_topics.map(topic => <span key={topic} className="badge badge-student" style={{ textTransform: 'none', letterSpacing: 0 }}>{topic}</span>)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ padding: '16px 24px', borderTop: '1px solid var(--color-border)', background: '#FAFAFF' }}>
+                    <button type="button" className="btn-primary" onClick={handleCreateAiCourse} disabled={creatingAiCourse}>
+                      {creatingAiCourse ? <><Loader className="spin" size={15} /> Creating course...</> : <><Plus size={15} /> Create Course from This</>}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           )}
         </>

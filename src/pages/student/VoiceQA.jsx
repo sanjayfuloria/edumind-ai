@@ -76,7 +76,7 @@ export default function VoiceQA() {
           </div>
           <h1 style={{ fontSize: '24px' }}>Voice Q&A</h1>
         </div>
-        <p style={{ color: 'var(--color-muted)' }}>Ask questions with your voice — powered by Whisper & GPT-4o with TTS response</p>
+        <p style={{ color: 'var(--color-muted)' }}>Ask questions with your voice — powered by Whisper & GPT-5.6 with TTS response</p>
       </div>
 
       {/* Course selector */}
@@ -122,7 +122,7 @@ export default function VoiceQA() {
           {recording ? 'Recording... Click to stop' : processing ? 'Processing your question...' : 'Click to ask a question'}
         </h3>
         <p style={{ color: 'var(--color-muted)', fontSize: '14px' }}>
-          {recording ? 'Speak clearly. AI will transcribe & answer.' : 'Powered by OpenAI Whisper → GPT-4o → TTS'}
+          {recording ? 'Speak clearly. AI will transcribe & answer.' : 'Powered by OpenAI Whisper → GPT-5.6 → TTS'}
         </p>
       </div>
 

@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import toast from 'react-hot-toast';
-import { Brain, Eye, EyeOff, Loader, GraduationCap, Shield } from 'lucide-react';
+import { Brain, Eye, EyeOff, Loader, GraduationCap, Shield, Sparkles } from 'lucide-react';
 
 export default function AuthPage() {
   const [mode, setMode] = useState('login'); // login | register
@@ -15,6 +15,22 @@ export default function AuthPage() {
   const navigate = useNavigate();
 
   const ADMIN_CODE = import.meta.env.VITE_ADMIN_REGISTRATION_CODE || 'EDUMIND_ADMIN_2024';
+  const DEMO_ADMIN_EMAIL = import.meta.env.VITE_DEMO_ADMIN_EMAIL;
+  const DEMO_STUDENT_EMAIL = import.meta.env.VITE_DEMO_STUDENT_EMAIL;
+  const demoLogins = [
+    {
+      label: 'Try as Admin',
+      icon: Shield,
+      email: DEMO_ADMIN_EMAIL,
+      color: '#A78BFA',
+    },
+    {
+      label: 'Try as Student',
+      icon: GraduationCap,
+      email: DEMO_STUDENT_EMAIL,
+      color: '#38BDF8',
+    },
+  ].filter(item => item.email);
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -39,6 +55,12 @@ export default function AuthPage() {
       toast.error(err.message.replace('Firebase: ', '').replace(/\(auth\/.*\)/, ''));
     }
     setLoading(false);
+  }
+
+  function handleDemoLogin({ email }) {
+    setMode('login');
+    setForm(f => ({ ...f, email, password: '' }));
+    toast.success('Demo email selected. Enter the evaluator demo password to continue.');
   }
 
   function update(key, val) { setForm(f => ({ ...f, [key]: val })); }
@@ -137,16 +159,45 @@ export default function AuthPage() {
             </div>
           </form>
 
-          {/* Demo credentials hint */}
-          <div style={{ marginTop: '20px', padding: '12px', background: 'rgba(99,102,241,0.1)', borderRadius: '8px', border: '1px solid rgba(99,102,241,0.2)' }}>
-            <p style={{ color: '#94A3B8', fontSize: '12px', textAlign: 'center' }}>
-              💡 <strong style={{ color: '#A5B4FC' }}>Demo:</strong> Register a student account to explore the platform
-            </p>
-          </div>
+          {demoLogins.length > 0 && (
+            <div style={{ marginTop: '20px', padding: '14px', background: 'rgba(99,102,241,0.1)', borderRadius: '10px', border: '1px solid rgba(99,102,241,0.2)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '7px', color: '#A5B4FC', fontSize: '12px', fontWeight: 700, fontFamily: 'Space Grotesk', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: '10px' }}>
+                <Sparkles size={14} /> Evaluator Demo
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: '10px' }}>
+                {demoLogins.map(({ label, icon: Icon, email, color }) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => handleDemoLogin({ email })}
+                    disabled={loading}
+                    style={{
+                      padding: '11px 10px',
+                      borderRadius: '10px',
+                      border: `1.5px solid ${color}55`,
+                      background: `${color}18`,
+                      color,
+                      cursor: loading ? 'not-allowed' : 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      fontFamily: 'Space Grotesk',
+                      fontWeight: 700,
+                      fontSize: '13px',
+                      opacity: loading ? 0.65 : 1,
+                    }}
+                  >
+                    <Icon size={16} /> {label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         <p style={{ color: '#475569', fontSize: '12px', textAlign: 'center', marginTop: '20px' }}>
-          Powered by OpenAI GPT-4o · Built for OpenAI Build Week 2024
+          Powered by OpenAI GPT-5.6 · Built for OpenAI Build Week 2024
         </p>
       </div>
     </div>

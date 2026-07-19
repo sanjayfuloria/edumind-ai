@@ -27,9 +27,11 @@ export async function updateUserProfile(uid, data) {
 
 export async function getAllUsers(role = null) {
   let q = collection(db, 'users');
-  if (role) q = query(q, where('role', '==', role), orderBy('createdAt', 'desc'));
+  if (role) q = query(q, where('role', '==', role));
   const snap = await getDocs(q);
-  return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  return snap.docs
+    .map(d => ({ id: d.id, ...d.data() }))
+    .sort((a, b) => (b.createdAt?.toMillis?.() || 0) - (a.createdAt?.toMillis?.() || 0));
 }
 
 // ─────────────────────────────────────────────────────────
